@@ -4,6 +4,7 @@ import com.example.transcripttodiagram.security.JwtAuthenticationEntryPoint;
 import com.example.transcripttodiagram.security.JwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -39,8 +40,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Отключаем сессии
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/students/register", "/api/students/login").permitAll() // Открытые пути
-                        .anyRequest().authenticated()) // Все остальные запросы требуют аутентификации
+                        .requestMatchers("/api/students/register", "/api/students/login").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/students").authenticated() // Разрешить изменение профиля
+                        .anyRequest().authenticated())
+                // Все остальные запросы требуют аутентификации
                 .exceptionHandling(exceptionHandling ->
                         exceptionHandling.authenticationEntryPoint(jwtAuthenticationEntryPoint)) // Обработчик ошибок аутентификации
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class); // JWT фильтр
