@@ -1,51 +1,68 @@
 package com.example.transcripttodiagram.controller;
 
-
+import com.example.transcripttodiagram.dto.StudentDTO;
 import com.example.transcripttodiagram.model.Student;
+import com.example.transcripttodiagram.repository.StudentRepository;
 import com.example.transcripttodiagram.security.JwtUtil;
 import com.example.transcripttodiagram.service.AuthService;
 import com.example.transcripttodiagram.service.StudentService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/students")
+@RequestMapping("/api")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5174")
 public class StudentController {
+
     private final StudentService studentService;
+    private final StudentRepository studentRepository;
     private final AuthService authService;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-
+    private static final Logger logger = LoggerFactory.getLogger(StudentController.class);
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Student student) {
         if (studentService.findByEmail(student.getEmail()) != null) {
-            return ResponseEntity.badRequest().body("Email already exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Email already exists"));
         }
 
         student.setPassword(passwordEncoder.encode(student.getPassword()));
         student.setLastLogin(LocalDateTime.now());
-        Student savedStudent = studentService.save(student);
 
+        if (student.getSelectedSubjects() == null) {
+            student.setSelectedSubjects(List.of());
+        }
+
+        Student savedStudent = studentService.save(student);
         UserDetails userDetails = authService.loadUserByUsername(savedStudent.getEmail());
         String token = jwtUtil.generateToken(userDetails.getUsername());
 
-        return ResponseEntity.ok(Map.of("token", token, "message", "Registration successful. Please login."));
+        return ResponseEntity.ok(Map.of("token", token));
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+        logger.info("Login attempt for email: {}", credentials.get("email"));
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
@@ -53,8 +70,9 @@ public class StudentController {
                             credentials.get("password")
                     )
             );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid credentials");
+        } catch (BadCredentialsException e) {
+            logger.warn("Failed login attempt for email: {}", credentials.get("email"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
         }
 
         UserDetails userDetails = authService.loadUserByUsername(credentials.get("email"));
@@ -62,165 +80,67 @@ public class StudentController {
 
         Student student = studentService.findByEmail(credentials.get("email"));
         student.setLastLogin(LocalDateTime.now());
-        studentService.save(student);
+        studentRepository.save(student);
 
-        return ResponseEntity.ok(Map.of("token", token, "message", "Login successful. Welcome to Home Page."));
+        return ResponseEntity.ok(Map.of("token", token));
     }
 
-
-//
-//import com.example.transcripttodiagram.model.Student;
-//import com.example.transcripttodiagram.security.JwtUtil;
-//import com.example.transcripttodiagram.service.AuthService;
-//import com.example.transcripttodiagram.service.StudentService;
-//import lombok.RequiredArgsConstructor;
-//import org.springframework.http.ResponseEntity;
-//import org.springframework.security.authentication.AuthenticationManager;
-//import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-//import org.springframework.security.core.userdetails.UserDetails;
-//import org.springframework.security.crypto.password.PasswordEncoder;
-//import org.springframework.web.bind.annotation.*;
-//
-//import java.time.LocalDateTime;
-//import java.util.List;
-//import java.util.Map;
-//
-//@RestController
-//@RequestMapping("/api/students")
-//@RequiredArgsConstructor
-//public class StudentController {
-//
-//    private final StudentService studentService;
-//    private final AuthService authService;
-//    private final JwtUtil jwtUtil;
-//    private final PasswordEncoder passwordEncoder;
-//    private final AuthenticationManager authenticationManager;
-//
-//    @PostMapping("/register")
-//    public ResponseEntity<?> register(@RequestBody Student student) {
-//        if (studentService.findByEmail(student.getEmail()) != null) {
-//            return ResponseEntity.badRequest().body("Email already exists");
-//        }
-//
-//        student.setPassword(passwordEncoder.encode(student.getPassword()));
-//        student.setLastLogin(LocalDateTime.now());
-//        Student savedStudent = studentService.save(student);
-//
-//        UserDetails userDetails = authService.loadUserByUsername(savedStudent.getEmail());
-//        String token = jwtUtil.generateToken(userDetails.getUsername());
-//
-//        return ResponseEntity.ok(Map.of("token", token));
-//    }
-//
-//    @PostMapping("/login")
-//    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
-//        try {
-//            authenticationManager.authenticate(
-//                    new UsernamePasswordAuthenticationToken(
-//                            credentials.get("email"),
-//                            credentials.get("password")
-//                    )
-//            );
-//        } catch (Exception e) {
-//            return ResponseEntity.badRequest().body("Invalid credentials");
-//        }
-//
-//        UserDetails userDetails = authService.loadUserByUsername(credentials.get("email"));
-//        String token = jwtUtil.generateToken(userDetails.getUsername());
-//
-//        Student student = studentService.findByEmail(credentials.get("email"));
-//        student.setLastLogin(LocalDateTime.now());
-//        studentService.save(student);
-//
-//        return ResponseEntity.ok(Map.of("token", token));
-//    }
-
-    @GetMapping
-    public ResponseEntity<List<Student>> getAllStudents() {
-        return ResponseEntity.ok(studentService.findAll());
-    }
-
-
-    // Получить студента по ID
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getStudentById(@PathVariable Long id) {
-        Student student = studentService.findById(id);
-        if (student == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(student);
-    }
-
-    // Получить студента по email
-    @GetMapping("/email/{email}")
-    public ResponseEntity<?> getStudentByEmail(@PathVariable String email) {
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentStudent(Authentication authentication) {
+        String email = authentication.getName();
         Student student = studentService.findByEmail(email);
+
         if (student == null) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Student not found"));
         }
-        return ResponseEntity.ok(student);
+
+        StudentDTO studentDTO = new StudentDTO(student.getEmail(), student.getLastLogin());
+        return ResponseEntity.ok(studentDTO);
     }
 
-    // Обновить студента по ID
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateStudentById(@PathVariable Long id, @RequestBody Student updatedStudent) {
-        Student student = studentService.findById(id);
+    @PutMapping("/update")
+    public ResponseEntity<?> updateStudent(Authentication authentication, @RequestBody Student updatedStudent) {
+        String email = authentication.getName();
+        Student student = studentService.findByEmail(email);
+
         if (student == null) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Student not found"));
         }
 
-        if (updatedStudent.getEmail() != null) {
+        if (updatedStudent.getEmail() != null && !updatedStudent.getEmail().equals(student.getEmail())) {
             student.setEmail(updatedStudent.getEmail());
         }
-        if (updatedStudent.getPassword() != null) {
+        if (updatedStudent.getPassword() != null && !updatedStudent.getPassword().isEmpty()) {
             student.setPassword(passwordEncoder.encode(updatedStudent.getPassword()));
         }
 
         studentService.save(student);
-        return ResponseEntity.ok(student);
+        String newToken = jwtUtil.generateToken(student.getEmail());
+
+        return ResponseEntity.ok(Map.of("token", newToken, "email", student.getEmail()));
     }
 
-    // Обновить студента по email
-    @PutMapping("/email/{email}")
-    public ResponseEntity<?> updateStudentByEmail(@PathVariable String email, @RequestBody Student updatedStudent) {
+    @DeleteMapping("/delete")
+    public ResponseEntity<?> deleteStudent(Authentication authentication) {
+        String email = authentication.getName();
         Student student = studentService.findByEmail(email);
+
         if (student == null) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Student not found"));
         }
 
-        if (updatedStudent.getEmail() != null) {
-            student.setEmail(updatedStudent.getEmail());
-        }
-        if (updatedStudent.getPassword() != null) {
-            student.setPassword(passwordEncoder.encode(updatedStudent.getPassword()));
-        }
-
-        studentService.save(student);
-        return ResponseEntity.ok(student);
+        studentService.delete(student);
+        return ResponseEntity.ok(Map.of("message", "Student deleted successfully"));
     }
 
-    // Удалить студента по ID
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteStudentById(@PathVariable Long id) {
-        Student student = studentService.findById(id);
-        if (student == null) {
-            return ResponseEntity.notFound().build();
-        }
-        studentService.delete(student);
-        return ResponseEntity.ok().build();
-    }
+    @GetMapping("/all")
+    public ResponseEntity<List<StudentDTO>> getAllStudents() {
+        List<StudentDTO> students = studentService.findAll()
+                .stream()
+                .map(s -> new StudentDTO(s.getEmail(), s.getLastLogin()))
+                .collect(Collectors.toList());
 
-    // Удалить студента по email
-    @DeleteMapping("/email/{email}")
-    public ResponseEntity<?> deleteStudentByEmail(@PathVariable String email) {
-        Student student = studentService.findByEmail(email);
-        if (student == null) {
-            return ResponseEntity.notFound().build();
-        }
-        studentService.delete(student);
-        return ResponseEntity.ok().build();
+
+        return ResponseEntity.ok(students);
     }
 }
-
-
-

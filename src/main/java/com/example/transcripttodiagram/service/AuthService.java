@@ -1,5 +1,4 @@
 package com.example.transcripttodiagram.service;
-
 import com.example.transcripttodiagram.model.Student;
 import com.example.transcripttodiagram.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;

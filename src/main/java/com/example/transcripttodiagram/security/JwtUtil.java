@@ -3,6 +3,7 @@ package com.example.transcripttodiagram.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,13 @@ public class JwtUtil {
 
     @Value("${jwt.expiration}")
     private Long expiration;
+
+    @PostConstruct
+    public void init() {
+        System.out.println("JWT Secret: " + secret);
+        System.out.println("JWT Expiration: " + expiration);
+    }
+
 
     public String generateToken(String email) {
         Map<String, Object> claims = new HashMap<>();
