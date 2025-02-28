@@ -31,4 +31,6 @@ public class Student {
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties("student")
     private List<StudentSubject> selectedSubjects = new ArrayList<>();
+
+
 }

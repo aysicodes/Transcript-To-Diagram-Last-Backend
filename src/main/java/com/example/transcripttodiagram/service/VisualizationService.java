@@ -31,10 +31,11 @@ public class VisualizationService {
     public VisualizationResponse processSubjects(List<SubjectGradeDTO> input, String email) {
         System.out.println("Input: " + input);
 
-        Student student = studentRepository.findByEmail(email);
-        if (student == null) {
-            throw new RuntimeException("Student not found");
-        }
+        // Найти студента или выбросить исключение
+        Student student = studentRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Student not found with email: " + email));
+
+        // Очистить список выбранных предметов
         student.getSelectedSubjects().clear();
 
         Set<Skill> allSkills = new HashSet<>();
@@ -47,8 +48,8 @@ public class VisualizationService {
             ss.setStudent(student);
             ss.setSubject(subject);
             ss.setScore(dto.getScore());
-            student.getSelectedSubjects().add(ss);
 
+            student.getSelectedSubjects().add(ss);
             allSkills.addAll(subject.getSkills());
         });
 
@@ -58,6 +59,7 @@ public class VisualizationService {
             throw new RuntimeException("No skills found for the given subjects");
         }
 
+        // Анализ навыков
         Map<Skill, SkillType> skillTypes = new HashMap<>();
         Map<Skill, String> skillGroups = new HashMap<>();
 
@@ -108,6 +110,7 @@ public class VisualizationService {
 
         return new VisualizationResponse(commonSkills, singleSkills);
     }
+
 
     public VisualizationResponse getVisualizationData(List<SubjectGradeDTO> input, String email) {
         return processSubjects(input, email);

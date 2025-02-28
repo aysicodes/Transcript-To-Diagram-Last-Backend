@@ -7,7 +7,13 @@ import com.example.transcripttodiagram.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.CategoryAxis;
+import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.chart.renderer.category.StandardBarPainter;
+import org.jfree.chart.title.TextTitle;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +24,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,13 +34,8 @@ public class DiagramExportService {
     private final StudentRepository studentRepository;
 
     public byte[] exportDiagram(String format, float quality, int width, Long studentId) throws IOException {
-        // Получаем список SubjectGradeDTO для конкретного студента по studentId
         List<SubjectGradeDTO> studentData = getSubjectGradeDataForStudent(studentId);
-
-        // Получаем данные для визуализации
         VisualizationResponse data = visualizationService.getVisualizationData(studentData, getStudentEmailById(studentId));
-
-        // Генерируем изображение
         JFreeChart chart = createChart(data);
         return saveChartAsImage(chart, format, width, (int)(width * 0.6), quality);
     }
@@ -51,13 +53,15 @@ public class DiagramExportService {
     private JFreeChart createChart(VisualizationResponse data) {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
-        data.getCommonSkills().forEach((skill, score) ->
-                dataset.addValue(score, "Common Skills", skill));
+        for (Map.Entry<String, Double> entry : data.getCommonSkills().entrySet()) {
+            dataset.addValue(entry.getValue(), "Common Skills", entry.getKey());
+        }
 
-        data.getSingleSkills().forEach((skill, score) ->
-                dataset.addValue(score, "Single Skills", skill));
+        for (Map.Entry<String, Integer> entry : data.getSingleSkills().entrySet()) {
+            dataset.addValue(entry.getValue(), "Single Skills", entry.getKey());
+        }
 
-        return ChartFactory.createBarChart(
+        JFreeChart chart = ChartFactory.createBarChart(
                 "Competency Analysis",
                 "Skills",
                 "Score",
@@ -67,13 +71,34 @@ public class DiagramExportService {
                 true,
                 false
         );
+
+        CategoryPlot plot = chart.getCategoryPlot();
+        BarRenderer renderer = (BarRenderer) plot.getRenderer();
+        renderer.setBarPainter(new StandardBarPainter()); // Убираем градиенты для четких цветов
+
+        // Настраиваем цвета столбцов
+        Paint[] colors = new Paint[]{Color.BLUE, Color.GREEN, Color.RED, Color.ORANGE, Color.CYAN};
+        for (int i = 0; i < dataset.getRowCount(); i++) {
+            renderer.setSeriesPaint(i, colors[i % colors.length]);
+        }
+
+        // Добавляем заголовок и увеличиваем шрифты
+        chart.setTitle(new TextTitle("Competency Analysis", new Font("Arial", Font.BOLD, 16)));
+        plot.getDomainAxis().setLabelFont(new Font("Arial", Font.BOLD, 14));
+        plot.getRangeAxis().setLabelFont(new Font("Arial", Font.BOLD, 14));
+
+        // Настройка подписей оси X (поворот на 45 градусов)
+        CategoryAxis domainAxis = plot.getDomainAxis();
+        domainAxis.setTickLabelFont(new Font("Arial", Font.BOLD, 12));
+        domainAxis.setCategoryLabelPositions(CategoryLabelPositions.UP_45);
+
+        return chart;
     }
 
     private byte[] saveChartAsImage(JFreeChart chart, String format,
                                     int width, int height, float quality) throws IOException {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2 = image.createGraphics();
-
         chart.draw(g2, new Rectangle2D.Double(0, 0, width, height));
         g2.dispose();
 

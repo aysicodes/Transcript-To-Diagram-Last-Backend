@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -27,8 +28,9 @@ public class StudentService {
     }
 
     public Student findByEmail(String email) {
-        return studentRepository.findByEmail(email);
+        return studentRepository.findByEmail(email).orElse(null); // ✅ Вернем null, если студент не найден
     }
+
 
     public Student findById(Long id) {
         return studentRepository.findById(id).orElse(null); // Возвращаем null, если студент не найден
@@ -47,10 +49,10 @@ public class StudentService {
         inactiveStudents.forEach(studentRepository::delete);
     }
 
-    @Transactional
-    public Student updateLastLogin(String email) {
-        Student student = studentRepository.findByEmail(email);
-        student.setLastLogin(LocalDateTime.now());
-        return studentRepository.save(student);
-    }
+//    @Transactional
+//    public Student updateLastLogin(String email) {
+//        Student student = studentRepository.findByEmail(email);
+//        student.setLastLogin(LocalDateTime.now());
+//        return studentRepository.save(student);
+//    }
 }
