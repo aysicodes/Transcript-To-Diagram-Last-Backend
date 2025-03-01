@@ -1,36 +1,26 @@
-# 1. Используем минимальный образ OpenJDK 17
+# Используем образ с OpenJDK
 FROM openjdk:17-jdk-slim AS build
 
-# 2. Устанавливаем рабочую директорию
+# Устанавливаем Maven
+RUN apt-get update && apt-get install -y maven
+
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# 3. Копируем файл pom.xml и скрипты Maven Wrapper
-COPY pom.xml mvnw mvnw.cmd ./
+# Копируем файл pom.xml
+COPY pom.xml .
 
-# 4. Даем права на выполнение mvnw
-RUN chmod +x mvnw
+# Загружаем зависимости
+RUN mvn dependency:go-offline
 
-# 5. Скачиваем зависимости, чтобы ускорить сборку
-RUN RUN mvn dependency:go-offline
-
-
-# 6. Копируем оставшиеся файлы проекта
+# Копируем весь проект
 COPY . .
 
-# 7. Собираем приложение (без тестов для ускорения)
-RUN ./mvnw clean package -DskipTests
+# Сборка проекта
+RUN mvn clean install -DskipTests
 
-# 8. Создаем финальный контейнер на основе OpenJDK 17
-FROM openjdk:17-jdk-slim
-
-# 9. Устанавливаем рабочую директорию
-WORKDIR /app
-
-# 10. Копируем собранный JAR-файл из предыдущего этапа
-COPY --from=build /app/target/TranscriptToDiagram-1.0-SNAPSHOT.jar app.jar
-
-# 11. Открываем порт 8080
+# Открываем порт
 EXPOSE 8080
 
-# 12. Запускаем приложение
-CMD ["java", "-jar", "app.jar"]
+# Команда для запуска приложения
+CMD ["java", "-jar", "target/TranscriptToDiagram-1.0-SNAPSHOT.jar"]
