@@ -11,7 +11,8 @@ COPY pom.xml mvnw mvnw.cmd ./
 RUN chmod +x mvnw
 
 # 5. Скачиваем зависимости, чтобы ускорить сборку
-RUN ./mvnw dependency:go-offline
+RUN RUN mvn dependency:go-offline
+
 
 # 6. Копируем оставшиеся файлы проекта
 COPY . .
